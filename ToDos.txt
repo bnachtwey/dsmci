@@ -1,0 +1,8 @@
+# ToDo List of new functions
+[ ] profiling 
+  [x] add profiling, write times used for each folder to certain file
+  [ ] consider profiling in (re-)ordering the folder to process
+[ ] add dirsonly processing to tidy orphaned folders
+[ ] forever option:
+    put folder to be process in a list that can extended during runtime, so if the job runs very long, already processed folder can be added again.
+    => if some folders take very long, other can procees another time
