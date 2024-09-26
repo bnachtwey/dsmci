@@ -3,7 +3,7 @@ Fork of the project formerly developed at TU Braunschweig and GWDG
 
 Now continued privately :-)
 
-(C) 2023 Bjørn Nachtwey himself
+(C) 2023 -- 2024 Bjørn Nachtwey himself
 
 (C) 2014 -- 2023 Bjørn Nachtwey @ www.gwdg.de
 
