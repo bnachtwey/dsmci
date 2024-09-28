@@ -32,6 +32,20 @@ The following text gives an analysis and some approaches to solve it. It was ori
    * [Variant 1](#Simple4Allv1)
    * [Variant 2](#Simple4Allv2)
 * [One approach for all file systems](#OneApproach4All)
+   * [Idea and first steps using BASH](#O4A-Bash)
+   * [An excursion to the PowerShell](#O4A-PS)
+   * [PERL - one solution for all (?) worlds and further development of the simple approach](#O4A-Perl)
+      * [Further development: Deeper dive into the directory tree and start parallel threads based on multiple directory levels](#O4AP-FDev)
+	  * [Evaluation of the individual runs](#O4AP-EvalRuns)
+	  * [Performance optimization using profiling](#O4AP-PerfProf)
+   * [Open Issues / Outlook](#O4A-Outlook)
+* [In addition, how do you speed up the restore?](#ParallelRestore)
+* [Availability / Access to source code / Alternatives](#AvailabiltyAlternatives)
+* [Transferability to other backup solutions](#Transferabililty)
+* [Acknowledgement](#Acknowledgement)
+* *Excursuses*
+   * [Workaround for VIRTUALMOUNTPOINTS for Windows clients](#ExcVMPWin)
+   * [Multiple threads using perl ](#ExcThreadsI)
 * [Addon: functions to be added](#AAditionalFunctions)
    * [Profiling based reording of folderlist](#ProfilingReorder)
    * [Empty folders](#EmptyFolders)
@@ -193,7 +207,7 @@ Changes to the directory names distribute the data across several ISP nodes and 
 In summary, there are certainly application scenarios for both approaches, but experience at GWDG shows that the effort is quite high and there are always a few power users who again need special treatment with these two approaches in order to achieve a usable benefit.
 
 ## One approach for all file systems <a name="OneApproach4All"></a>
-### Idea and first steps using BASH
+### Idea and first steps using BASH <a name="O4A-Bash"></a>
 Already in the last decade the (at that time) *Generali Versicherungs-AG* was facing with the problem outlined at the beginning and *Rudolf Wüst* as backup admin extended the aforementioned approach by a decisive idea. 
 From this, he developed a solution that successfully parallelized the *“search problem”* with up to 2000 threads. Mr. Wüst kindly shared his extension and the author took it up and developed it further within the scope of his work at the GWDG.
 The goal of a practicable solution must be to capture all directories, store them in an ISP node and still parallelize the search. This can be done by executing a script instead of a simple backup call, which in turn starts several parallel threads to back up the directories. The core of the script consists of a loop of the following form (example 1).
@@ -272,10 +286,10 @@ The problem mentioned with the idea that individual directories use a considerab
 The next step would be to create the directory list over several levels and thus increase the number of partial backups. As a result, inequality should be more evenly balanced out.
 In addition to the return code of a “client schedule”, detailed error messages and an overview in the form of a summary can also be read out in the reporting of the ISP server; this is (currently) not possible with the specified script; it only provides a traffic-light status via the return code.
 
-### An excursion to the PowerShell
+### An excursion to the PowerShell <a name="O4A-PS"></a>
 PowerShell. Unix affinity combined with reservations about the Powershell and above all the double effort ended this project after some work without having created an executable version.
 
-### PERL - one solution for all (?) worlds and further development of the simple approach
+### PERL - one solution for all (?) worlds and further development of the simple approach <a name="O4A-Perl"></a>
 The closest solution was initially overlooked: a programming/scripting language for all operating systems, neither BASH/MinGW/WSL nor PowerShell / PowerShell Core on Linux, but PERL.
 
 PERL offers numerous functions - also in the area of access to files and directories, which are encapsulated by the respective implementation in such a way that the actual command is independent of the operating system. File system paths can even be specified in both Unix and Windows nomenclature (i.e. with / or \ as directory separator) and thanks to the File::Spec→canonpath function they are converted to the correct format. To a large extend the source code does not need be individually adapted for the respective platform. Exceptions are the paths to the binaries, i.e. \opt\tivoli\client\ba\bin\dsmc or C:\Program Files\Tivoli\baclient\dsmc.exe and (currently) only partial readout of the directory tree using find (Linux) and Robocopy.exe (Windows).
@@ -289,14 +303,14 @@ in the main script only the number of started threads is incremented, in the sub
 check whether the desired number of threads has been reached and waiting for a thread to be terminated and then start a new one.
 In detail, the source code is of course somewhat more complex and also takes into account, for example, if that starting a subthread was not successful.
 
-#### Further development: Deeper dive into the directory tree and start parallel threads based on multiple directory levels
+#### Further development: Deeper dive into the directory tree and start parallel threads based on multiple directory levels <a name="O4AP-FDev"></a>
 The tests with the parallelization approach directly below the base path showed exactly those effects that were already addressed during parallelization via institutes: Individual directories are (usually) larger than all other parallel-lying directories together, 
 so that the speed gain is considerably lower than expected / or desired. A better balance can only be achieved via additional directories; these can be found by searching through further levels in addition to the first, highest directory level below the start path and then allowing the backup to be made via all these directories.
 The first problem is that the directories are nested, i.e. a partial backup of a directory from a higher level also includes those subdirectories that are backed up in other parallel threads anyway. In this script, this problem was solved by saving all directories above the set *“dive depth”* with the option `-SUbdir=No`, 
 i.e. only the contents of these directories including the names of the subdirectories, but not their contents. In a second step, the directories are backed up at the lowest level specified with their subdirectories (-SUbdir=Yes option) (Since backups without subdirectories are usually much faster, 
 those directories with subdirectories are backed up first and those without are backed up second).
 
-#### Evaluation of the individual runs
+#### Evaluation of the individual runs <a name="O4AP-EvalRuns"></a>
 Not only for profiling (see below) but also to create a summary of the backup, each sub-thread writes its output to a separate file that contains its own ID in the name in addition to the process ID of the script. Thus, even if the script is aborted, the output can be clearly assigned.
 
 Although the overall evaluation can only take place at the end of the backup, a sufficiently deep dive into the directory tree in practice quickly leads to several thousand to hundreds of thousands of small files and thus to considerable problems. Therefore, the sub threads write the content of the output file to a central log file after completion of their backup, which is evaluated at the end of the script. Within the context of this writing, the information whether subdirectories have been processed is also stored and the runtime is already converted into seconds for profiling and saved. The return value of the backup call is also added.
@@ -325,7 +339,7 @@ are counted in each case and as a total.
 
 From the sum of the elapsed times and the runtime of the loop via the directories (WALL CLOCK TIME) the script calculates a parallel speedup, which shows how much faster the parallelization is compared to the sum of the individual times.
 
-#### Performance optimization using profiling
+#### Performance optimization using profiling  <a name="O4AP-PerfProf"></a>
 The runtime of the parallel backup is essentially determined by the runtimes of the individual backup runs. Without a detailed measurement (but by comparing the time for the script call with commented out the backup call) it is assumed that the runtime of the PERL statements is negligible in comparison. The aim of the optimization is the “correct” order of the directories, so that
 
 the large, long-running ones run as parallel as possible,
@@ -338,7 +352,7 @@ Directories that are in the profiling file but no longer exist in the directory 
 
 At the end of the evaluation, the profiling list is overwritten.
 
-### Open Issues / Outlook
+### Open Issues / Outlook <a name="O4A-Outlook"></a>
 There are still some questions left, for example about transferring the summary to the server log.
 
 For a good solution, error handling should be added to make the script fault-tolerant to certain situations.
@@ -347,14 +361,14 @@ It is also possible to split the work steps “Identify directories” and “pa
 
 One problem that cannot be solved is the fact that “partial incremental backups” do not change the “Last Backup” attributes of the nodes or file spaces and, of course, this is not done within the scope of the outlined script. You should refrain from writing to the DB2 of the ISP servers, as this affects IBM's warranty. IBM expressly prohibits direct access to the ISP-DB2 outside of corresponding instructions within the scope of support.
 
-## In addition, how do you speed up the restore?
+## In addition, how do you speed up the restore? <a name="ParalleRestore"></a>
 The previously mentioned approaches with ISP on-board means and the outlined approach for parallelization only works for backup. If many files are to be restored from the backup, this is very easy with the approaches with several nodes for a file space, since a separate restore must run for each node anyway and the processes run in parallel. For the parallel threads approach, an adjustment for the restore based on a file list is easily possible: Instead of a “folder list”, a file list is used for the restore.
 
 However, it should be noted that in an environment with a tape library as a storage backend, the number of drives usually limits the performance of the restore. Furthermore, ISP usually organizes the restore (without the -disablenqr=yes option) so that the tape mounts are optimized. If a file list is processed in parallel by numerous parallel threads, the server cannot optimize the tape accesses. However, if a disk-based FILE or container pool is used, the parallel restore over numerous threads is faster. If the data is stored on two servers via server replication, the restore can also be distributed over both servers and thus additionally accelerated.
 
 Unfortunately, experience shows that “full restores” also involve enormous effort when parallelizing and can only be accelerated unsatisfactorily.
 
-## Availability / Access to source code / Alternatives
+## Availability / Access to source code / Alternatives <a name="AvailabilityAlternatives"></a>
 It can be assumed that neither Rudi Wüst only has invented the original idea nor I can claim to be the only one to have had and implemented the idea outlined. Rather, many TSM/SP users may have faced the same problem and found similar solutions.
 
 A commercial implementation that follows a similar approach to parallelization can be found in the product [*„MAGS“*](https://www.general-storage.com/mags.html) of General Storage. In addition to binding support, *“MAGS”* offers regular further development and uses several NAS nodes for parallelization with ISILON Scale Out systems. 
@@ -362,17 +376,17 @@ A more detailed product analysis should not take place here. You must also deter
 
 The script mentioned in this article is freely available in my GITHUB Repository the *Apache 2.0 license*. The scripts may be used and modified without restrictions. I look forward to receiving your feedback and suggestions.
 
-## Transferability to other backup solutions
+## Transferability to other backup solutions <a name="Transferabililty"></a>
 The approaches presented address the problem of file identification and can therefore be applied to all other questions where a file list is to be created. If you replace the call of the SP-CLI with another CLI call, you can also find all files in parallel, filtered by all attributes supported by find using appropriate parameters. 
 You can also add another loop that does arbitrary operations with all entries of a complete file list. This also allows you to optimize other backup solutions that can process a directory or file list.
 
-## Acknowledgement
+## Acknowledgement <a name="Acknowledgement"></a>
 I'd like to thank Gerd Becker ([Cristie Data GmbH](https://www.cristie.de)), Wolfgang Hitzler ([IBM](https://www.ibm.com), retired) and Manuel Panea ([MPCDF](https://www.mpcdf.mpg.de/)) for proofreading the original article and making suggestions for changes and improvements.
 
 Special thanks to [Mr. Rudolf Wüst](https://de.linkedin.com/in/rudolf-w%C3%BCst-2258a4122) for his generosity in sharing his ideas.
 
 # Excursus
-## Workaround for VIRTUALMOUNTPOINTS for Windows clients
+## Workaround for VIRTUALMOUNTPOINTS for Windows clients<a name="ExcVMPWin"></a>
 For UNIX, Linux, and MacOS it is possible to configure individual directories as virtual drives in TSM/SP. This simplifies the configuration of the backup, since the virtual drive can be specified directly as backup source instead of specifying the actual drive and excluding all directories that are not to be backed up using exclude rules.
 
 Unfortunately, there is no comparable function for Windows. This also eliminates the possibility of parallelizing the backup via different virtual drives.
@@ -389,7 +403,7 @@ Of course, this way is highly error-prone, additionally all directories newly cr
 	
 **From the point of view of the TSM/SP client, the shares are independent network shares and can be backed up in parallel!**
 
-## Threads in PERL <a name="ThreadsInPerl"></a>
+## Multiple threads using PERL <a name="ExcThreadsInPerl"></a>
 
 PERL offers its own thread module and thus a much more elegant method than the complex solutions for the BASH or the Powershell:
 
