@@ -13,15 +13,25 @@ The following text gives an analysis and some approaches to solve it. It was ori
 
 *This Text is now rolling a forward edition, updated whenever there's something to add :-)*
 ## Table of Content
-1. [Motivation](#Motivation)
-2. [Current Situation](#CurrentSituation)
-3. [Non-working approaches](#NonWorkingApproaches)
-4. [Acceleration with SP on-board tools](#SPOnboardTools)
+* [Motivation](#Motivation)
+* [Current Situation](#CurrentSituation)
+* [Non-working approaches](#NonWorkingApproaches)
+* [Acceleration with SP on-board tools](#SPOnboardTools)
    * [Simplified identification exclusively via the change date](#SimplifiedIdentification)
    * [Turning off ACLn and checksums](#TurningOffACL)
    * [Parallelization of backups for multiple file spaces](#MultipleFilespaces)
    * [Explicit backup of changed files only](#ChangedFilesOnly)
    * [JournalBasedBackup / FilepathDemon](#JBBFpD)
+* [Hybrid approach with snapshots](#HybridSnapshots)
+* [*Excursus:* File systems that support fast backup](#FSfastBackup)
+   * [IBM Storage Scale (ISS, formerly GPFS)](#FSGPFS)
+   * [NetApp SnapDiff](#FSSnapDiff)
+   * [Quantum StorNext](#FSStorNext)
+   * [General remarks](#FSGeneralRemarks)
+* [Two (simple) ideas for all file systems](#Simple4All)
+   * [Variant 1](#Simple4Allv1)
+   * [Variant 2](#Simple4Allv2)
+* [One approach for all file systems](#OneApproach4All)
 * [Addon: functions to be added](#AAditionalFunctions)
    * [Profiling based reording of folderlist](#ProfilingReorder)
    * [Empty folders](#EmptyFolders)
@@ -96,12 +106,12 @@ Processing ACLn (and thus previously checking) and creating checksums slows down
 * `SKIPNTPermissions Yes`  bypasses processing of Windows file system security information.
 * `SKIPNTSecuritycrc Yes` prevents the calculation of a CRC checksum (option for Windows only)
 
-### Parallelization of backups for multiple file spaces
+### Parallelization of backups for multiple file spaces<a name="MultipleFilespaces"></a>
 If the data to be backed up are on several partitions, the backup process can be distributed to parallel streams using the `RESSOURCEUTILIZATION` option (in contrast to IBM documentation, significantly more than 10 are possible, > 100 streams are reported in practice). 
 This makes better use of the bandwidth and considerably reduces the search time through parallelization. Since this also generates additional sessions on the SP server side, the number of `MAXSESSIONS` may have to be increased, too. 
 This approach works only when actually backing up multiple file spaces. As a workaround, of course, a single file space can be split into seemingly multiple file spaces with the VIRTUALMOUNTpoint option and then this approach works, of course. (See also Excursus on *virtual Mount points for Windows Clients*)
 
-### Explicit backup of changed files only
+### Explicit backup of changed files only <a name=""></a>
 If information is available, which files have changed since the last backup and which files have been deleted since then, ISP can only back up these files. Instead of an “incremental backup”, a “selective backup” with the explicit specification of these files is then possible:
 ```
 dsmc sel –filelist=<File with Names of files changed>
@@ -112,7 +122,7 @@ dsmc expire –filelist=<File with Names of files deleted>
 ```
 The basic principle of *“selective backup”* is also used in the following approach and in the “file systems that support fast backup”, but requires two explicit lists of files that have been modified or deleted.
 
-### JournalBasedBackup / Filepath Demon
+### JournalBasedBackup / Filepath Demon <a name="JBBFpD"></a>
 IBM has been offering the *JournalBasedBackup (JBB)* method since TSM 5.
 
 The *JBB Demon* (or *Filepath Demon*) monitors the file system to be backed up and collects information on new, modified and deleted files. During backup, the TSM/ISP client uses this information in the same way as doing a selective backup. The effort for identifying the backup candidates is eliminated and the backup is reduced to the transfer of the new / changed data.
@@ -122,10 +132,10 @@ Tests done by the GWDG with a Linux fileserver with about 150 TB capacity distri
 There is also an important limitation:
 Journal Based Backup only works with local file systems. CIFS / NFS and cluster file systems do not work.
 
-Hint:
+*Hint:*<br>
 Optimizations for data transmission can be found in the Performance Tuning-Guide (V7.1.6).
 
-## Hybrid approach with snapshots
+## Hybrid approach with snapshots <a name="HybridSnapshots"></a>
 Numerous file systems and most filers offer the possibility to create snapshots. A hybrid approach can be implemented by combining snapshots and ISP backup:
 
 Backups are done as often as possible, e.g. weekly, in between snapshots.
@@ -134,36 +144,44 @@ In addition to the considerable expansion of the backup time window, there is us
 
 A prerequisite for this approach is, of course, that the file systems support snapshots – and in sufficient quantities.
 
-## File systems that support fast backup
+## Excurs: File systems that support fast backup <a name="FSfastBackup"></a>
 Some file systems / filers support a fast backup using ISP by identifying the necessary backup candidates and making them available to the ISP client. (This list is only a selection):
 
-### IBM Spectrum Scale (ISS, formerly GPFS)
+### IBM Spectrum Scale (ISS, formerly GPFS)<a name="FSGPFS"></a>
 IBM's cluster file system naturally supports backup with ISP and even offers its own script mmbackup. This not only uses the information about the backup candidates, but can also parallelize the data transfer over several (ISP) nodes and GPFS servers.
 However mmbackup does not simply run out-of-the-box: The initial creation of the configuration requires a little trial and error, but afterwards mmbackup runs both stable and performant.
 In addition to ISP, IBM Spectrum Scale also offers close integration with HPSS as an HSM system, so that the problem can also be reduced by (partially) transferring the data to HPSS - whereby ISP/ISS can also back up very large data volumes in a comparatively short time.
 
-### NetApp SnapDiff
+### NetApp with SnapDiff<a name="FSSnapDiff"></a>
 NetApp has also been supporting backup of its own NAS filers since TSM 5 in a variety of ways. In addition to NDMP, the SnapDiff function also accelerates the incremental backup. SnapDiff transfers the changes to files and directories between two snapshots to the ISP client. The integration goes so far that the ISP client can even trigger the required snapshots on the filer and after a successful backup can delete the previous one on its own.
 
 Since the SnapDiff function compares only two snapshots, but does not take into account in any way whether the last backup was successful, the same problems arise as when using the -INCRbydate option: errors from the last backup are not compensated and a regular normal incremental backup is strongly recommended. mmbackup, in contrast, takes into account the backup status of all data and is fault-tolerant with regard to the problems mentioned above.
 
 Basically, each cluster/scale-out file system should be able to provide a list of new, modified and deleted files, since this (meta) information is necessary for the consistency of the data (and especially the caches) on the cluster nodes. In practice, the problems are that this information is not easily accessible and there are no tools by manufacturers to access this data. Quantum has responded to customer demand and is currently examining how this information can be made available to the StorNext file system. DELL/EMC also offers ScaleOut NAS systems with the ISILON systems. In version 7 of the operating system, called OneFS, there is the possibility to log changed files, but the resource requirements are so high that there is a lasting impairment of the entire system. With OneFS 8 there should also be improvements here.
 
-## Two (simple) ideas for all file systems
+### Quantum StorNext<a name="FSStorNext"></a>
+:construction: t.b.d. :construction:
+
+### General Remarks<a name="FSGeneralRemarks"></a>
+:construction: t.b.d. :construction:
+
+All Filesystems mentioned above are somehow *distributed and scale out file systems*. They all share one basic property: Due to the distribution of the data and the distributed access using different access points (e.g. *Gateway Server / Nodes*) there must be an internal process that knows about all changes on the stored files, so that other nodes than the one holding the primary copy get notified on any changes and then update their cached copy. This knowledge of file changes allow to create file lists for new, changed and deleted files, that TSM/SP can then process as mentioned above. So any filesystem having such knowledge (e.g. also *CephFS*) should be able to provide *changed files lists*.
+
+## Two (simple) ideas for all file systems <a name="Simple4All"></a>
 For all users who do not have an IBM Spectrum Scale in operation (mmbackup is the best solution for this!) and neither full backups nor NDMP this raises the question of what to do now?
 
 As previously mentioned, identifying backup candidates takes most of the time during ISP backup. This process examines the entire file tree of the file system to be backed up – sequentially in a single thread. The solution is to turn this one process into several parallel processes.
 
 Users can usually be divided into groups (e.g. working groups or institutes). Especially in academic environments, this classification can also be found in file systems, since there is often a folder level with faculties or institutes for easier access control, and below this level are the user and workgroup directories.
 
-### Variant 1
+### Variant 1 <a name="Simple4Allv1"></a>
 Parallel backup is possible by setting up a separate node for each faculty or institute instead of a single ISP node for the entire file system and performing the backup “faculty by faculty” / “institute by institute”. Instead of a single process, several processes search the file system in parallel (file servers are able to process even several hundred parallel processes) and the search times should be significantly reduced. In practice, this approach reveals at least two problems::
 
 Not all faculties / institutes have the same amount of data; usually there are one or two that use almost the entire capacity of the file system alone. Therefore, the backups of some run much faster than of others, for the “big users” the backup time is only slightly reduced in the worst case. Overall, the (time) gain is usually only marginal.
 If further faculties (probably not so often) or institutes are added, the backup administrator must adapt his configuration in time, otherwise the new ones are left out.
 Using Unix, the nodes can be separated relatively elegantly using “VIRTUALMOUNTs”, for Windows you either have to create exclude.dir rules for each node, which is both complex and error-prone, or work with a trick (see excursus “VIRTUALMOUNTPOINTS for Windows”).
 
-### Variant 2
+### Variant 2 <a name="Simple4Allv1"></a>
 Often, however, the users on the file systems are not organized in groups, but all directories lie flat next to each other on the entry level. Creating a separate ISP node for each user directory repeats the second problem mentioned above and is very time-consuming regarding the number of users.
 It is therefore easier to distinguish the directories according to a pattern, for example after the first character(s): : ^[a,A], ^[b,B], … ,^[z,Z], ^[0-9] (ISP even provides regular expressions at this point!)
 You get 27 or 729 ISP nodes, which automatically include all new directories. Unfortunately, the Regular Expressions (RegEx) formulations only capture the directories that exist, not the deleted ones. Remedy is possible if you additionally back up all directories of the start path without subdirectories.
@@ -174,7 +192,7 @@ The configuration becomes - especially if one distinguishes between the first tw
 Changes to the directory names distribute the data across several ISP nodes and the restore in particular becomes time-consuming.
 In summary, there are certainly application scenarios for both approaches, but experience at GWDG shows that the effort is quite high and there are always a few power users who again need special treatment with these two approaches in order to achieve a usable benefit.
 
-## One approach for all file systems
+## One approach for all file systems <a name="OneApproach4All"></a>
 ### Idea and first steps using BASH
 Already in the last decade the (at that time) *Generali Versicherungs-AG* was facing with the problem outlined at the beginning and *Rudolf Wüst* as backup admin extended the aforementioned approach by a decisive idea. 
 From this, he developed a solution that successfully parallelized the *“search problem”* with up to 2000 threads. Mr. Wüst kindly shared his extension and the author took it up and developed it further within the scope of his work at the GWDG.
@@ -368,7 +386,7 @@ Of course, this way is highly error-prone, additionally all directories newly cr
 * the paths to be backed up can be accessed via the loopback device:
   * `DOMAIN \\127.0.0.1\<Share1>`
   * `DOMAIN \\127.0.0.1<Share2>`
-    
+	
 **From the point of view of the TSM/SP client, the shares are independent network shares and can be backed up in parallel!**
 
 ## Threads in PERL <a name="ThreadsInPerl"></a>
@@ -382,7 +400,7 @@ For this, the return value query of the `fork()` routine provides: if the value 
 my $cpid = fork();
 if (! defined $cpid)
 {	# forking failed!
-       exit 1; # abort the script
+	   exit 1; # abort the script
 }
 if ($cpid)
 {	# parent process
