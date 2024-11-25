@@ -6,12 +6,12 @@
 -->
 🚧 🚧 UNDER CONSTRUCTION :-) 🚧  🚧 
 
-The you can summarize the root cause for long backup times of large filesystems often in one single statement:<br><br>
+The you can summarize the root cause for long backup times of large filesystems often in one single statement:<br>
 ***Identifiying changed files takes too much time!***
 
 The following text gives an analysis and some approaches to solve it. It was originally published in the [GWDG Nachrichten 11/2016](https://gwdg.de/about-us/gwdg-news/2016/GN_11-2016_www.pdf), a second edition followed in [GWDG Nachrichten 1-2/2019](https://www.gwdg.de/documents/20182/27257/GN_1-2-2019_www.pdf) as an english translation with some addons.
 
-*This Text is now rolling a forward edition, updated whenever there's something to add :-)*
+*This Text is now rolling a forward edition, updated whenever there's something to add (or typos and bugs to be fixed) :-)*
 ## Table of Content
 
 > needs to be fixed!
@@ -157,7 +157,7 @@ Numerous file systems and most filers offer the possibility to create snapshots.
 
 Backups are done as often as possible, e.g. weekly, in between snapshots.
 
-In addition to the considerable expansion of the backup time window, there is usually the positive side effect that the end users can access the snapshots directly and the admins are relieved of numerous restore requests. If the backup is also based on a snapshot, the problem of the opened files is also solved (error message ANE4987E Error processing '<NAME>': the object is in use by another process).
+In addition to the considerable expansion of the backup time window, there is usually the positive side effect that the end users can access the snapshots directly and the admins are relieved of numerous restore requests. If the backup is also based on a snapshot, the problem of the opened files is also solved (error message `ANE4987E Error processing '<NAME>': the object is in use by another process`).
 
 A prerequisite for this approach is, of course, that the file systems support snapshots – and in sufficient quantities.
 
@@ -166,24 +166,24 @@ A prerequisite for this approach is, of course, that the file systems support sn
 Some file systems / filers support a fast backup using ISP by identifying the necessary backup candidates and making them available to the ISP client. (This list is only a selection):
 
 ### IBM Storage Scale (ISS, formerly GPFS)
-IBM's cluster file system naturally supports backup with ISP and even offers its own script mmbackup. This not only uses the information about the backup candidates, but can also parallelize the data transfer over several (SP) nodes and GPFS servers.
-However mmbackup does not simply run out-of-the-box: The initial creation of the configuration requires a little trial and error, but afterwards mmbackup runs both stable and performant.
+IBM's cluster file system naturally supports backup with ISP and even offers its own script `mmbackup`. This not only uses the information about the backup candidates, but can also parallelize the data transfer over several (SP) nodes and GPFS servers.
+However `mmbackup` does not simply run out-of-the-box: The initial creation of the configuration requires a little trial and error, but afterwards mmbackup runs both stable and performant.
 In addition to ISP, IBM Spectrum Scale also offers close integration with HPSS as an HSM system, so that the problem can also be reduced by (partially) transferring the data to HPSS - whereby ISP/ISS can also back up very large data volumes in a comparatively short time.
 
 ### NetApp with SnapDiff
 NetApp has also been supporting backup of its own NAS filers since TSM 5 in a variety of ways. In addition to NDMP, the SnapDiff function also accelerates the incremental backup. SnapDiff transfers the changes to files and directories between two snapshots to the ISP client. The integration goes so far that the ISP client can even trigger the required snapshots on the filer and after a successful backup can delete the previous one on its own.
 
-Since the SnapDiff function compares only two snapshots, but does not take into account in any way whether the last backup was successful, the same problems arise as when using the -INCRbydate option: errors from the last backup are not compensated and a regular normal incremental backup is strongly recommended. mmbackup, in contrast, takes into account the backup status of all data and is fault-tolerant with regard to the problems mentioned above.
+Since the SnapDiff function compares only two snapshots, but does not take into account in any way whether the last backup was successful, the same problems arise as when using the `-INCRbydate` option: errors from the last backup are not compensated and a regular normal incremental backup is strongly recommended. mmbackup, in contrast, takes into account the backup status of all data and is fault-tolerant with regard to the problems mentioned above.
 
 Basically, each cluster/scale-out file system should be able to provide a list of new, modified and deleted files, since this (meta) information is necessary for the consistency of the data (and especially the caches) on the cluster nodes. In practice, the problems are that this information is not easily accessible and there are no tools by manufacturers to access this data. Quantum has responded to customer demand and is currently examining how this information can be made available to the StorNext file system. DELL/EMC also offers ScaleOut NAS systems with the ISILON systems. In version 7 of the operating system, called OneFS, there is the possibility to log changed files, but the resource requirements are so high that there is a lasting impairment of the entire system. With OneFS 8 there should also be improvements here.
 
 ### Quantum StorNext
-:construction: t.b.d. :construction:
+🚧  t.b.d. 🚧 
 
 ### General Remarks
-:construction: t.b.d. :construction:
+🚧  t.b.d. 🚧 
 
-All Filesystems mentioned above are somehow *distributed and scale out file systems*. They all share one basic property: Due to the distribution of the data and the distributed access using different access points (e.g. *Gateway Server / Nodes*) there must be an internal process that knows about all changes on the stored files, so that other nodes than the one holding the primary copy get notified on any changes and then update their cached copy. This knowledge of file changes allow to create file lists for new, changed and deleted files, that TSM/SP can then process as mentioned above. So any filesystem having such knowledge (e.g. also *CephFS*) should be able to provide *changed files lists*.
+All file systems mentioned above are somehow *distributed and scale out file systems*. They all share one basic property: Due to the distribution of the data and the distributed access using different access points (e.g. *Gateway Server / Nodes*) there must be an internal process that knows about all changes on the stored files, so that other nodes than the one holding the primary copy get notified on any changes and then update their cached copy. This knowledge of file changes allow to create file lists for new, changed and deleted files, that TSM/SP can then process as mentioned above. So any filesystem having such knowledge (e.g. also *CephFS*) should be able to provide *changed files lists*.
 
 ## Two (simple) ideas for all file systems
 For all users who do not have an IBM Spectrum Scale in operation (mmbackup is the best solution for this!) and neither full backups nor NDMP this raises the question of what to do now?
@@ -202,9 +202,7 @@ Using Unix, the nodes can be separated relatively elegantly using “VIRTUALMOUN
 
 ### Variant 2
 Often, however, the users on the file systems are not organized in groups, but all directories lie flat next to each other on the entry level. Creating a separate ISP node for each user directory repeats the second problem mentioned above and is very time-consuming regarding the number of users.
-It is therefore easier to distinguish the directories according to a pattern, for example after the first character(s): : ^[a,A], ^[b,B], … ,^[z,Z], ^[0-9] (ISP even provides regular expressions at this point!)
-You get 27 or 729 ISP nodes, which automatically include all new directories. Unfortunately, the Regular Expressions (RegEx) formulations only capture the directories that exist, not the deleted ones. Remedy is possible if you additionally back up all directories of the start path without subdirectories.
-Although this variant is often better than the first, it does not meet all expectations:
+It is therefore easier to distinguish the directories according to a pattern, for example after the first character(s): :` ^[a,A]`, `^[b,B]`, … ,`^[z,Z]`, `^[0-9]` (IP even provides regular expressions at this point!). You get 27 or 729 IP nodes, which automatically include all new directories. Unfortunately, the Regular Expressions (RegEx) formulations only capture the directories that exist, not the deleted ones. Remedy is possible if you additionally back up all directories of the start path without sub-directories. Although this variant is often better than the first, it does not meet all expectations:
 
 Solving the deleted directories problem is cumbersome.
 The configuration becomes - especially if one distinguishes between the first two letters - very extensive.
@@ -226,12 +224,12 @@ For each (find all directories in given start path)
 
 Instead of *“one incremental backup”*, many partial incremental backups are performed for each directory.
 
-The deleted directories are recorded with a subsequent backup of the start path without subdirectories –- the last specification is extremely important, otherwise, a normal *“incremental backup”* is made on the entire file system.
+The deleted directories are recorded with a subsequent backup of the start path without subdirectories – the last specification is extremely important, otherwise, a normal *“incremental backup”* is made on the entire file system.
 
 As source code for the BASH this looks like in example 2:
 ```bash
 startpath=<path to start with>;
-folderlist=<path to a file containing foldernames>;
+folderlist=<path to a file for storing foldernames>;
 find $startpath –xdev –mindepth 1 –maxdepth 1 –type d –print > $folderlist
 for $i in $(cat $folderlist)
 do
@@ -250,7 +248,7 @@ As BASH code the loop looks like example 3.
 ```bash
 pid=$$;	# parents process id 
 startpath=<path to start with>;
-folderlist=<path to a file containing foldernames>;
+folderlist=<path to a file for storing foldernames>;
 maxthreads=<max. number of parallel threads>;
 find $startpath –xdev –mindepth 1 –maxdepth 1 –type d –print > $folderlist
 
@@ -286,36 +284,35 @@ rm $folderlist;
 
 In the extended form, essential goals are now achieved, but one cannot be completely satisfied:
 
-A return value is missing for reporting for the ISP server. In the simplest case, you can add a line return 0 at the end, then the schedule is always successful - regardless of whether errors occur or not. As already added in example 3, one should rather collect the output of the individual “partial incremental backups” and evaluate them at the end of the script, e.g. search for errors or summarize the “summaries”. Depending on the type (and number if necessary) of errors and the “Files failed”, the script can then give the appropriate return values. (This extension is already included in the published source code.)
+ A return value is missing for reporting for the ISP server. In the simplest case, you can add a line return 0 at the end, then the schedule is always successful - regardless of whether errors occur or not. As already added in example 3, one should rather collect the output of the individual “partial incremental backups” and evaluate them at the end of the script, e.g. search for errors or summarize the “summaries”. Depending on the type (and number if necessary) of errors and the “Files failed”, the script can then give the appropriate return values. (This extension is already included in the published source code.)
+
 The problem mentioned with the idea that individual directories use a considerable proportion of the file system size and thus significantly influence the runtime of the backup is not solved by the script. The inequality of the data set / number of objects will certainly be smaller, but will only shift.
 The next step would be to create the directory list over several levels and thus increase the number of partial backups. As a result, inequality should be more evenly balanced out.
 In addition to the return code of a “client schedule”, detailed error messages and an overview in the form of a summary can also be read out in the reporting of the ISP server; this is (currently) not possible with the specified script; it only provides a traffic-light status via the return code.
 
 ### An excursion to the PowerShell
-PowerShell. Unix affinity combined with reservations about the Powershell and above all the double effort ended this project after some work without having created an executable version.
+PowerShell. Unix affinity combined with reservations about the PowerShell and above all the double effort ended this project after some work without having created an executable version.
 
 ### PERL - one solution for all (?) worlds and further development of the simple approach
 
 The closest solution was initially overlooked: a programming/scripting language for all operating systems, neither BASH/MinGW/WSL nor PowerShell / PowerShell Core on Linux, but PERL.
 
-PERL offers numerous functions - also in the area of access to files and directories, which are encapsulated by the respective implementation in such a way that the actual command is independent of the operating system. File system paths can even be specified in both Unix and Windows nomenclature (i.e. with / or \ as directory separator) and thanks to the `File::Spec→canonpath` function they are converted to the correct format. To a large extend the source code does not need be individually adapted for the respective platform. Exceptions are the paths to the binaries, i.e. `\opt\tivoli\client\ba\bin\dsmc` or `C:\Program Files\Tivoli\baclient\dsmc.exe` and (currently) only partial readout of the directory tree using find (Linux) and Robocopy.exe (Windows).
+PERL offers numerous functions - also in the area of access to files and directories, which are encapsulated by the respective implementation in such a way that the actual command is independent of the operating system. File system paths can even be specified in both Unix and Windows nomenclature (i.e. with `/` or `\` as directory separator) and thanks to the `File::Spec→canonpath` function they are converted to the correct format. To a large extend the source code does not need be individually adapted for the respective platform. Exceptions are the paths to the binaries, i.e. `\opt\tivoli\client\ba\bin\dsmc` or `C:\Program Files\Tivoli\baclient\dsmc.exe` and (currently) only partial readout of the directory tree using `find` (Linux) and `Robocopy.exe` (Windows).
 Another reason for PERL is that it allows the use of threads in a simple way and also ensures that only a certain number of (sub) threads run at the same time and thus the start of further threads only takes place after completion of previous threads - and this independent of the operating system!
 
 The steps outlined for the BASH are thus reduced to three essential steps in PERL:
 
-- create a new subthread with the fork() function
-- branch the source code into the paths main script and script for the subthread,
-- in the main script only the number of started threads is incremented, in the subthread the partial incremental backup takes place
+- create a new subthread with the `fork()` function
+- branch the source code into the paths main script and script for the sub-thread,
+- in the main script only the number of started threads is incremented, in the sub-thread the partial incremental backup takes place
 - check whether the desired number of threads has been reached and waiting for a thread to be terminated and then start a new one.
 
-In detail, the source code is of course somewhat more complex and also takes into account, for example, if that starting a subthread was not successful.
+In detail, the source code is of course somewhat more complex and also takes into account, for example, if that starting a sub-thread was not successful.
 
 #### Further development: Deeper dive into the directory tree and start parallel threads based on multiple directory levels
 
 The tests with the parallelization approach directly below the base path showed exactly those effects that were already addressed during parallelization via institutes: Individual directories are (usually) larger than all other parallel-lying directories together, so that the speed gain is considerably lower than expected / or desired. A better balance can only be achieved via additional directories; these can be found by searching through further levels in addition to the first, highest directory level below the start path and then allowing the backup to be made via all these directories.
-The first problem is that the directories are nested, i.e. a partial backup of a directory from a higher level also includes those subdirectories that are backed up in other parallel threads anyway. In this script, this problem was solved by saving all directories above the set *“dive depth”* with the option `-SUbdir=No`, 
-i.e. only the contents of these directories including the names of the subdirectories, but not their contents. In a second step, the directories are backed up at the lowest level specified with their subdirectories (-SUbdir=Yes option) (Since backups without subdirectories are usually much faster, 
-those directories with subdirectories are backed up first and those without are backed up second).
+The first problem is that the directories are nested, i.e. a partial backup of a directory from a higher level also includes those sub-directories that are backed up in other parallel threads anyway. In this script, this problem was solved by saving all directories above the set *“dive depth”* with the option `-SUbdir=No`,  i.e. only the contents of these directories including the names of the sub-directories, but not their contents. In a second step, the directories are backed up at the lowest level specified with their sub-directories (`-SUbdir=Yes` option) (Since backups without sub-directories are usually much faster, those directories with sub-directories are backed up first and those without are backed up second).
 
 #### Evaluation of the individual runs
 Not only for profiling (see below) but also to create a summary of the backup, each sub-thread writes its output to a separate file that contains its own ID in the name in addition to the process ID of the script. Thus, even if the script is aborted, the output can be clearly assigned.
@@ -338,17 +335,17 @@ In the current implementation (December 2018), the final evaluation sums up In t
 
 In addition, the number of
 
-* of warnings (/^AN[RS][0-9]{4}E/)
-* the serious error (/^AN[RS][0-9]{4}S/)
-* the error due to ANS1228E and ANS1820E
-* the Server-Out-of-Space-error (ANS1292S) additionally
+* of warnings (`/^AN[RS][0-9]{4}E/`)
+* the serious error (`/^AN[RS][0-9]{4}S/`)
+* the error due to `ANS1228E` and `ANS1820E`
+* the *server-out-of-space*-error (`ANS1292S`) additionally
 are counted in each case and as a total.
 
 From the sum of the elapsed times and the runtime of the loop via the directories (WALL CLOCK TIME) the script calculates a parallel speedup, which shows how much faster the parallelization is compared to the sum of the individual times.
 
 #### Performance optimization using profiling
-The runtime of the parallel backup is essentially determined by the runtimes of the individual backup runs. Without a detailed measurement (but by comparing the time for the script call with commented out the backup call) it is assumed that the runtime of the PERL statements is negligible in comparison. The aim of the optimization is the “correct” order of the directories, so that the large, long-running ones run as parallel as possible, the large ones are started because a mismatch balance has a less dramatic effect on the shorter runtimes of the smaller directories.
-Since the runtime of the backups cannot be estimated in advance, the optimization is based on the last backup (and does assume no dramatic changes, which could only be predicted by complex and therefore time-consuming analyses). As described above, the sub threads also write the runtime in seconds to the central log file at the end of the backup, so that a list of all directories with the respective runtimes is created when they are evaluated. This list is sorted by descending runtimes and written to a profile file.
+The runtime of the parallel backup is essentially determined by the run times of the individual backup runs. Without a detailed measurement (but by comparing the time for the script call with commented out the backup call) it is assumed that the runtime of the PERL statements is negligible in comparison. The aim of the optimization is the “correct” order of the directories, so that the large, long-running ones run as parallel as possible, the large ones are started because a mismatch balance has a less dramatic effect on the shorter run times of the smaller directories.
+Since the runtime of the backups cannot be estimated in advance, the optimization is based on the last backup (and does assume no dramatic changes, which could only be predicted by complex and therefore time-consuming analyses). As described above, the sub threads also write the runtime in seconds to the central log file at the end of the backup, so that a list of all directories with the respective run times is created when they are evaluated. This list is sorted by descending run times and written to a profile file.
 
 The next time the script is called, it first creates a list of all directories to be backed up. In the next step (this part does not yet work for Windows and has therefore been swapped out again) the backup script compares this list with the entries from the profiling file.
 
@@ -363,14 +360,14 @@ For a good solution, error handling should be added to make the script fault-tol
 
 It is also possible to split the work steps “Identify directories” and “partial incremental backup”, so that for very large file systems, the list of directories to be processed is filled up again as soon as the backup window has expired, but still runs one or a few threads - but probably increasing the immersion depth is the better approach.
 
-One problem that cannot be solved is the fact that “partial incremental backups” do not change the “Last Backup” attributes of the nodes or file spaces and, of course, this is not done within the scope of the outlined script. You should refrain from writing to the DB2 of the ISP servers, as this affects IBM's warranty. IBM expressly prohibits direct access to the ISP-DB2 outside of corresponding instructions within the scope of support.
+One problem that cannot be solved is the fact that “partial incremental backups” do not change the “Last Backup” attributes of the nodes or file spaces and, of course, this is not done within the scope of the outlined script. You should refrain from writing to the DB2 of the SP servers, as this affects IBM's warranty. IBM expressly prohibits direct access to the SP-DB2 outside of corresponding instructions within the scope of support.
 
 ## In addition, how do you speed up the restore?
 The previously mentioned approaches with ISP on-board means and the outlined approach for parallelization only works for backup. If many files are to be restored from the backup, this is very easy with the approaches with several nodes for a file space, since a separate restore must run for each node anyway and the processes run in parallel. For the parallel threads approach, an adjustment for the restore based on a file list is easily possible: Instead of a “folder list”, a file list is used for the restore.
 
-However, it should be noted that in an environment with a tape library as a storage backend, the number of drives usually limits the performance of the restore. Furthermore, ISP usually organizes the restore (without the -disablenqr=yes option) so that the tape mounts are optimized. If a file list is processed in parallel by numerous parallel threads, the server cannot optimize the tape accesses. However, if a disk-based FILE or container pool is used, the parallel restore over numerous threads is faster. If the data is stored on two servers via server replication, the restore can also be distributed over both servers and thus additionally accelerated.
+However, it should be noted that in an environment with a tape library as a storage backend, the number of drives usually limits the performance of the restore. Furthermore, SP usually organizes the restore (without the `-disablenqr=yes` option) so that the tape mounts are optimized. If a file list is processed in parallel by numerous parallel threads, the server cannot optimize the tape accesses. However, if a disk-based, FILE or container pool is used, the parallel restore over numerous threads is faster. If the data is stored on two servers via server replication, the restore can also be distributed over both servers and thus additionally accelerated.
 
-Unfortunately, experience shows that “full restores” also involve enormous effort when parallelizing and can only be accelerated unsatisfactorily.
+Unfortunately, experience shows that “full restores” also involve enormous effort when using parallelization and can only be accelerated unsatisfactorily.
 
 ## Availability / Access to source code / Alternatives
 It can be assumed that neither Rudi Wüst only has invented the original idea nor I can claim to be the only one to have had and implemented the idea outlined. Rather, many TSM/SP users may have faced the same problem and found similar solutions.
@@ -380,7 +377,7 @@ A more detailed product analysis should not take place here. You must also deter
 
 The script mentioned in this article is freely available in my GITHUB Repository the *Apache 2.0 license*. The scripts may be used and modified without restrictions. I look forward to receiving your feedback and suggestions.
 
-## Transferability to other backup solutions
+## Transfer-ability to other backup solutions
 The approaches presented address the problem of file identification and can therefore be applied to all other questions where a file list is to be created. If you replace the call of the SP-CLI with another CLI call, you can also find all files in parallel, filtered by all attributes supported by find using appropriate parameters. 
 You can also add another loop that does arbitrary operations with all entries of a complete file list. This also allows you to optimize other backup solutions that can process a directory or file list.
 
@@ -396,7 +393,7 @@ For UNIX, Linux, and MacOS it is possible to configure individual directories as
 
 Unfortunately, there is no comparable function for Windows. This also eliminates the possibility of parallelizing the backup via different virtual drives.
 
-However, if only individual directories are to be backed up, but not the remaining root directory in parallel, numerous exclusion rules must usually be created in the form of `exclude.dir´` statements in the `dsm.opt`. 
+However, if only individual directories are to be backed up, but not the remaining root directory in parallel, numerous exclusion rules must usually be created in the form of `exclude.dir` statements in the `dsm.opt`. 
 Of course, this way is highly error-prone, additionally all directories newly created in the root directory of a drive are not automatically excluded, but are included in the backup. The following workaround simplifies configuration and parallelization of the backup under Windows:
 
 * create an advanced share for each directory you want to back up.
@@ -415,7 +412,7 @@ PERL offers its own thread module and thus a much more elegant method than the c
 Using the `fork()` function, the PERL interpreter creates a second thread that starts at just this point in the script. This thread processes all of the statements below in the same way as the original script. It therefore makes sense to use an IF statement to branch the different tasks. 
 For this, the return value query of the `fork()` routine provides: if the value is not defined, no thread could be created, if the value is `true`, there is a new thread - and it is the parent routine in which this IF was executed. The value is also defined in the child thread, but `false`. The query could therefore look as follows:
 
-```
+```perl
 my $cpid = fork();
 if (! defined $cpid)
 {	# forking failed!
@@ -467,4 +464,4 @@ while (wait() != -1 ) ;
 ## Footnotes
 - [1](http://www.storageconference.us/2014/Presentations/Shimizu.pdf)
 - [2](http://www.insic.org/news/2015%20roadmap/15pdfs/2015%20Technical%20Roadmap.pdf)
-- [2b] After evaluation of the GWDG ISP servers in 2018: between 15% and 84% in addition to the active data, whereby the 84% is an outlier, the average value is 39%. 
+- [2b] After evaluation of the GWDG SP servers in 2018: between 15% and 84% in addition to the active data, whereby the 84% is an outlier, the average value is 39%. 
