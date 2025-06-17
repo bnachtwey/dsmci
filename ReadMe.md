@@ -3,7 +3,7 @@ Fork of the project formerly developed at TU Braunschweig and GWDG
 
 Now continued privately :-)
 
-(C) 2023 -- 2024 Bjørn Nachtwey himself
+(C) 2023 -- 2025 Bjørn Nachtwey himself
 
     mailto: desmci@bjoernsoe.net
 
