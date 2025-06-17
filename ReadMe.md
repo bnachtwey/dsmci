@@ -5,7 +5,7 @@ Now continued privately :-)
 
 (C) 2023 -- 2025 Bjørn Nachtwey himself
 
-    mailto: desmci@bjoernsoe.net
+    mailto: dsmci@bjoernsoe.net
 
 (C) 2014 -- 2023 Bjørn Nachtwey @ www.gwdg.de
 
